@@ -1,0 +1,32 @@
+[user]
+	name = piedrahitapablo
+	email = {{ .email }}
+[color]
+	ui = auto
+[pull]
+	ff = only
+[core]
+	editor = nvim
+	pager = delta
+[interactive]
+	diffFilter = delta --color-only
+[delta]
+	navigate = true
+[rerere]
+	enabled = true
+[merge]
+	conflictStyle = zdiff3
+[diff]
+	algorithm = histogram
+	colorMoved = default
+[rebase]
+	autosquash = true
+[init]
+	defaultBranch = main
+[url "git@github.com:"]
+	insteadOf = "https://github.com/"
+[url "git@github.com:"]
+	insteadOf = "gh:"
+[fetch]
+	prune = true
+	prunetags = true

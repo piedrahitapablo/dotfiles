@@ -1,0 +1,52 @@
+# docker
+function docker-sa() { docker stop $(docker ps -q); }
+function docker-cc() { docker rm $@ $(docker container ls -a -q); }
+function docker-ci() { docker rmi $@ $(docker images -q); }
+function docker-cv() { docker volume rm $(docker volume ls -q); }
+function docker-cn() { docker network rm $(docker network ls -q); }
+function docker-ca() {
+    docker-cc;
+    docker-ci;
+    docker-cv;
+    docker-cn;
+}
+alias docker-run="docker-compose run --service-ports --rm"
+alias docker-build="docker-compose build --force-rm"
+
+# python
+function venv_init() { python3 -m venv ~/.local/share/virtualenvs/$1 }
+function venv_shell() { source ~/.local/share/virtualenvs/$1/bin/activate; }
+# function pip_se() { cat $1 | xargs -n 1 pip install; }
+alias pip_se="cat requirements.txt | xargs -n 1 pip install"
+
+# git
+alias gmff="gm --ff-only"
+alias gulc="git reset HEAD~1 --soft"
+function gcbr() {
+    git fetch --all;
+    git checkout -b $1 origin/$1;
+}
+function force_pr() {
+    touch .update_pr_diff;
+    ga .update_pr_diff;
+    gc -m "Force pr diff update" -n;
+    gp;
+    git reset --hard HEAD~;
+    gp -f;
+}
+
+alias k="kubectl"
+alias t="terraform"
+alias n="nvim"
+alias y="yarn"
+
+# mac m1
+alias use_rosetta="env /usr/bin/arch -x86_64 /bin/zsh --login"
+alias colima_rosetta="colima start --arch aarch64 --vm-type=vz --vz-rosetta --cpu 4 --memory 8"
+
+# utils
+alias ports_in_use="sudo lsof -i -P -n | grep LISTEN"
+function add_bom() {
+    echo '\xEF\xBB\xBF' > "$1_with_bom.csv"
+    cat $1 >> "$1_with_bom.csv"
+}
