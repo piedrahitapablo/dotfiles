@@ -1,23 +1,28 @@
 # docker
-function docker-sa() { docker stop $(docker ps -q); }
-function docker-cc() { docker rm $@ $(docker container ls -a -q); }
-function docker-ci() { docker rmi $@ $(docker images -q); }
-function docker-cv() { docker volume rm $(docker volume ls -q); }
-function docker-cn() { docker network rm $(docker network ls -q); }
-function docker-ca() {
-    docker-cc;
-    docker-ci;
-    docker-cv;
-    docker-cn;
+function d-stop() {
+    docker stop $(docker ps -q);
 }
-alias docker-run="docker-compose run --service-ports --rm"
-alias docker-build="docker-compose build --force-rm"
-
-# python
-function venv_init() { python3 -m venv ~/.local/share/virtualenvs/$1 }
-function venv_shell() { source ~/.local/share/virtualenvs/$1/bin/activate; }
-# function pip_se() { cat $1 | xargs -n 1 pip install; }
-alias pip_se="cat requirements.txt | xargs -n 1 pip install"
+function d-clean() {
+    if [[ $1 == "containers" ]]; then
+        docker rm $(docker container ls -a -q);
+    fi
+    if [[ $1 == "images" ]]; then
+        docker rmi $(docker images -q);
+    fi
+    if [[ $1 == "volumes" ]]; then
+        docker volume rm $(docker volume ls -q);
+    fi
+    if [[ $1 == "networks" ]]; then
+        docker network rm $(docker network ls -q);
+    fi
+    if [[ $1 == "all" ]]; then
+        docker-sa;
+        docker rm $(docker container ls -a -q);
+        docker rmi $(docker images -q);
+        docker volume rm $(docker volume ls -q);
+        docker network rm $(docker network ls -q);
+    fi
+}
 
 # git
 alias gmff="gm --ff-only"
@@ -34,11 +39,16 @@ function force_pr() {
     git reset --hard HEAD~;
     gp -f;
 }
+function grreb() {
+    git fetch --all;
+    git rebase -i origin/$1;
+}
 
+alias d="docker"
 alias k="kubectl"
 alias t="terraform"
-alias n="nvim"
 alias y="yarn"
+alias p="pnpm"
 
 # mac m1
 alias use_rosetta="env /usr/bin/arch -x86_64 /bin/zsh --login"
@@ -46,7 +56,46 @@ alias colima_rosetta="colima start --arch aarch64 --vm-type=vz --vz-rosetta --cp
 
 # utils
 alias ports_in_use="sudo lsof -i -P -n | grep LISTEN"
-function add_bom() {
-    echo '\xEF\xBB\xBF' > "$1_with_bom.csv"
-    cat $1 >> "$1_with_bom.csv"
+alias etchosts="sudo nvim /etc/hosts"
+
+# neovim
+alias n="nvim"
+alias nvimcfg="cd ~/.config/nvim && n"
+
+# ssh
+function setup_gh_ssh() {
+    scp -p /Users/piedra/.ssh/id_ed25519_gh_remotes* $1:/home/ubuntu/.ssh/;
+    ssh $1 'eval "$(ssh-agent -s)" && ssh-add ~/.ssh/id_ed25519_gh_remotes';
+
+    ssh $1 '
+        git config --global user.name "piedrahitapablo" && \
+        git config --global user.email "juan.p@snappr.com"
+    ';
+
+    # add some aliases
+    ssh $1 '
+        echo 'alias ga="git add"' >> ~/.bashrc && \
+        echo 'alias gc="git commit --verbose"' >> ~/.bashrc && \
+        echo 'alias gp="git push"' >> ~/.bashrc && \
+        echo 'alias gl="git pull"' >> ~/.bashrc && \
+        echo 'alias gfa="git fetch --all --tags --prune --jobs=10"' >> ~/.bashrc && \
+        echo 'alias gco="git checkout"' >> ~/.bashrc
+    '
+}
+function setup_neovim_ssh() {
+    ssh $1 'curl https://get.volta.sh | bash'
+    ssh $1 '
+        volta install node && \
+        curl -LO https://github.com/BurntSushi/ripgrep/releases/download/14.1.0/ripgrep_14.1.0-1_amd64.deb && \
+        sudo dpkg -i ripgrep_14.1.0-1_amd64.deb
+    '
+    ssh $1 '
+        curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz && \
+        sudo rm -rf /opt/nvim && \
+        sudo tar -C /opt -xzf nvim-linux-x86_64.tar.gz && \
+        rm nvim-linux-x86_64.tar.gz && \
+        echo "export PATH="\$PATH:/opt/nvim-linux-x86_64/bin"" >> ~/.bashrc
+    '
+    ssh $1 'git clone git@github.com:piedrahitapablo/nvim-config.git ~/.config/nvim';
+    ssh $1 'echo 'alias n="nvim"' >> ~/.bashrc';
 }
