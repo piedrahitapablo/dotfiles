@@ -13,6 +13,8 @@
    ```bash
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
    ```
+   1. Make sure to run the commands printed at the end of the brew installation
+      logs
 1. Install packages from `Brewfile`
    ```bash
    brew bundle install
@@ -46,6 +48,7 @@
    ```bash
    pipx install pre-commit
    ```
+   1. Make sure to run the command to add `pipx` bins to `PATH`
 1. Setup SSH access for GitHub
 1. Setup neovim
    ```bash
@@ -53,6 +56,21 @@
    ```
 1. Install [Scroll Reverser](https://github.com/pilotmoon/Scroll-Reverser)
 1. Install Docker
+
+### Extra apps:
+
+- Conar
+- Daisy disk
+- Raycast
+- Stremio
+
+### Brewfile tips
+
+https://gist.github.com/ChristopherA/a579274536aab36ea9966f301ff14f3f
+
+- mv Brewfile{,.old}
+- brew bundle dump
+- diff Brewfile{.old,}
 
 ### Settings
 
