@@ -26,3 +26,5 @@ else
   export GIT_EDITOR='nvim'
 fi
 
+# fzf setup
+source <(fzf --zsh)

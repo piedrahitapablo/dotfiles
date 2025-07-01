@@ -1,28 +1,29 @@
 # docker
-function d-stop() {
-    docker stop $(docker ps -q);
+function docker-sa() { docker stop $(docker ps -q); }
+function docker-cc() { docker rm $@ $(docker container ls -a -q); }
+function docker-ci() { docker rmi $@ $(docker images -q); }
+function docker-cv() { docker volume rm $(docker volume ls -q); }
+function docker-cn() { docker network rm $(docker network ls -q); }
+function docker-ca() {
+    docker-cc;
+    docker-ci;
+    docker-cv;
+    docker-cn;
 }
-function d-clean() {
-    if [[ $1 == "containers" ]]; then
-        docker rm $(docker container ls -a -q);
-    fi
-    if [[ $1 == "images" ]]; then
-        docker rmi $(docker images -q);
-    fi
-    if [[ $1 == "volumes" ]]; then
-        docker volume rm $(docker volume ls -q);
-    fi
-    if [[ $1 == "networks" ]]; then
-        docker network rm $(docker network ls -q);
-    fi
-    if [[ $1 == "all" ]]; then
-        docker-sa;
-        docker rm $(docker container ls -a -q);
-        docker rmi $(docker images -q);
-        docker volume rm $(docker volume ls -q);
-        docker network rm $(docker network ls -q);
-    fi
+alias docker-run="docker-compose run --service-ports --rm"
+alias docker-build="docker-compose build --force-rm"
+
+# python
+function venv_init() { python3 -m venv ~/.local/share/virtualenvs/$1 }
+function venv_shell() { source ~/.local/share/virtualenvs/$1/bin/activate; }
+function venv_ls() { ls ~/.local/share/virtualenvs/; }
+function venv_rm() { 
+    # TODO: check $1 is not empty
+    # TODO: ask for confirmation
+    rm -rf ~/.local/share/virtualenvs/$1;
 }
+# function pip_se() { cat $1 | xargs -n 1 pip install; }
+alias pip_se="cat requirements.txt | xargs -n 1 pip install"
 
 # git
 alias gmff="gm --ff-only"
@@ -44,11 +45,9 @@ function grreb() {
     git rebase -i origin/$1;
 }
 
-alias d="docker"
 alias k="kubectl"
 alias t="terraform"
 alias y="yarn"
-alias p="pnpm"
 
 # mac m1
 alias use_rosetta="env /usr/bin/arch -x86_64 /bin/zsh --login"
@@ -56,14 +55,21 @@ alias colima_rosetta="colima start --arch aarch64 --vm-type=vz --vz-rosetta --cp
 
 # utils
 alias ports_in_use="sudo lsof -i -P -n | grep LISTEN"
+function add_bom() {
+    echo '\xEF\xBB\xBF' > "$1_with_bom.csv"
+    cat $1 >> "$1_with_bom.csv"
+}
 alias etchosts="sudo nvim /etc/hosts"
 
 # neovim
 alias n="nvim"
 alias nvimcfg="cd ~/.config/nvim && n"
 
+# iterm scripts
+alias itermscripts="cd ~/Library/Application\ Support/iTerm2/Scripts/ && n"
+
 # ssh
-function setup_gh_ssh() {
+function ssh_setup_gh() {
     scp -p /Users/piedra/.ssh/id_ed25519_gh_remotes* $1:/home/ubuntu/.ssh/;
     ssh $1 'eval "$(ssh-agent -s)" && ssh-add ~/.ssh/id_ed25519_gh_remotes';
 
@@ -73,19 +79,22 @@ function setup_gh_ssh() {
     ';
 
     # add some aliases
-    ssh $1 '
-        echo 'alias ga="git add"' >> ~/.bashrc && \
-        echo 'alias gc="git commit --verbose"' >> ~/.bashrc && \
-        echo 'alias gp="git push"' >> ~/.bashrc && \
-        echo 'alias gl="git pull"' >> ~/.bashrc && \
-        echo 'alias gfa="git fetch --all --tags --prune --jobs=10"' >> ~/.bashrc && \
-        echo 'alias gco="git checkout"' >> ~/.bashrc
+    ssh ubuntu@$SNAPPR_REMOTE_HOST '
+        echo "alias ga=\"git add\"" >> ~/.bashrc && \
+        echo "alias gc=\"git commit --verbose\"" >> ~/.bashrc && \
+        echo "alias gp=\"git push\"" >> ~/.bashrc && \
+        echo "alias gl=\"git pull\"" >> ~/.bashrc && \
+        echo "alias gfa=\"git fetch --all --tags --prune --jobs=10\"" >> ~/.bashrc && \
+        echo "alias gco=\"git checkout\"" >> ~/.bashrc
     '
 }
-function setup_neovim_ssh() {
+function ssh_setup_ghostty() {
+    infocmp -x | ssh $1 -- tic -x -
+}
+function ssh_setup_neovim() {
     ssh $1 'curl https://get.volta.sh | bash'
+    ssh $1 '~/.volta/bin/volta install node'
     ssh $1 '
-        volta install node && \
         curl -LO https://github.com/BurntSushi/ripgrep/releases/download/14.1.0/ripgrep_14.1.0-1_amd64.deb && \
         sudo dpkg -i ripgrep_14.1.0-1_amd64.deb
     '
@@ -97,5 +106,86 @@ function setup_neovim_ssh() {
         echo "export PATH="\$PATH:/opt/nvim-linux-x86_64/bin"" >> ~/.bashrc
     '
     ssh $1 'git clone git@github.com:piedrahitapablo/nvim-config.git ~/.config/nvim';
-    ssh $1 'echo 'alias n="nvim"' >> ~/.bashrc';
+    ssh $1 'echo "alias n=\"nvim\"" >> ~/.bashrc';
+}
+
+# utils
+function jwt-decode() {
+  local input="${1:-}"
+  if [ -z "$input" ]; then
+    if [ ! -t 0 ]; then
+      input=$(cat /dev/stdin)
+    else
+      echo >&2 '✗ Need an argument or have a piped input!'
+      return 1
+    fi
+  fi
+  
+  # Decode and store the JWT payload
+  local decoded=$(echo "$input" \
+    | jq -Rrce 'split(".")[1] | . + "=" * (. | 4 - length % 4)' \
+    | openssl base64 -d -A)
+  
+  # Log the full decoded JWT
+  echo "Decoded JWT:"
+  echo "$decoded" | jq .
+  
+  # Extract and format timestamp claims
+  echo -e "\nTimestamp Information:"
+  
+  # Format timestamp function for macOS compatibility
+  format_timestamp() {
+    local timestamp=$1
+    # Convert to integer to handle floating point values
+    timestamp=$(printf "%.0f" "$timestamp" 2>/dev/null)
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      # macOS date command
+      date -r "$timestamp" "+%Y-%m-%d %H:%M:%S" 2>/dev/null
+    else
+      # Linux date command
+      date -d "@$timestamp" "+%Y-%m-%d %H:%M:%S" 2>/dev/null
+    fi
+  }
+  
+  # Check and display issued at (iat) time
+  local iat=$(echo "$decoded" | jq -r '.iat // empty')
+  if [ ! -z "$iat" ]; then
+    echo "Issued at:     $(format_timestamp "$iat")"
+  fi
+  
+  # Check and display not before (nbf) time
+  local nbf=$(echo "$decoded" | jq -r '.nbf // empty')
+  if [ ! -z "$nbf" ]; then
+    echo "Not before:    $(format_timestamp "$nbf")"
+  fi
+  
+  # Check and display expiration (exp) time
+  local exp=$(echo "$decoded" | jq -r '.exp // empty')
+  if [ ! -z "$exp" ]; then
+    echo "Expires:       $(format_timestamp "$exp")"
+    
+    # Calculate and show time until expiration
+    local now=$(date +%s)
+    
+    # Convert exp to integer to handle floating point values
+    local exp_int=$(printf "%.0f" "$exp" 2>/dev/null)
+    local time_left=$((exp_int - now))
+    
+    if [ $time_left -lt 0 ]; then
+      local mins_ago=$(( -time_left / 60 ))
+      echo "Status:        Expired ($mins_ago minutes ago)"
+    else
+      local days=$((time_left / 86400))
+      local hours=$(((time_left % 86400) / 3600))
+      local minutes=$(((time_left % 3600) / 60))
+      
+      if [ $days -gt 0 ]; then
+        echo "Time remaining: $days days, $hours hours, $minutes minutes"
+      elif [ $hours -gt 0 ]; then
+        echo "Time remaining: $hours hours, $minutes minutes"
+      else
+        echo "Time remaining: $minutes minutes"
+      fi
+    fi
+  fi
 }
